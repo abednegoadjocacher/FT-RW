@@ -51,7 +51,7 @@ Follow these steps to set up the project locally.
 
 ```bash
 # Clone the repository
-git clone [my-repo-name-here]!(https://github.com/abednegoadjocacher/FT-RW)
+git clone ![my-repo-name-here](https://github.com/abednegoadjocacher/FT-RW)
 
 # Navigate to project folder
 cd icgc
