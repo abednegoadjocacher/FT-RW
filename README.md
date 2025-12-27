@@ -51,12 +51,11 @@ Follow these steps to set up the project locally.
 
 ```bash
 # Clone the repository
-git clone ![my-repo-name-here](https://github.com/abednegoadjocacher/FT-RW)
+git clone [https://github.com/abednegoadjocacher/FT-RW.git](https://github.com/abednegoadjocacher/FT-RW.git)
 
 # Navigate to project folder
-cd icgc
+cd icgc-pht-admin
 
 # Install dependencies
 npm install
 ```
-# THANK YOU
