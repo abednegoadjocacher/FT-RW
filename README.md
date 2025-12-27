@@ -51,7 +51,7 @@ Follow these steps to set up the project locally.
 
 ```bash
 # Clone the repository
-git clone [https://github.com/abednegoadjocacher/FT-RW.git](https://github.com/abednegoadjocacher/FT-RW.git)
+git clone https://github.com/abednegoadjocacher/FT-RW.git
 
 # Navigate to project folder
 cd icgc-pht-admin
