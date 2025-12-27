@@ -51,10 +51,12 @@ Follow these steps to set up the project locally.
 
 ```bash
 # Clone the repository
-git clone ![https://github.com/abednegoadjocacher/FT-RW](https://github.com/abednegoadjocacher/FT-RW)
+git clone [my-repo-name-here](https://github.com/abednegoadjocacher/FT-RW)
 
 # Navigate to project folder
 cd icgc
 
 # Install dependencies
 npm install
+```
+# THANK YOU
