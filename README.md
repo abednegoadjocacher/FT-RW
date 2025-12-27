@@ -54,7 +54,7 @@ Follow these steps to set up the project locally.
 git clone https://github.com/abednegoadjocacher/FT-RW.git
 
 # Navigate to project folder
-cd icgc-pht-admin
+cd FT-RW
 
 # Install dependencies
 npm install
