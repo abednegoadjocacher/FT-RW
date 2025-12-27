@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import { Lock, User, Eye, EyeOff, Home } from 'lucide-react';
-
-interface LoginProps {
-  onLogin: (email: string) => void;
-}
+import { LoginProps } from  "@/interface"
 
 export default function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('');
@@ -37,7 +34,7 @@ export default function Login({ onLogin }: LoginProps) {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-2xl mb-4 shadow-lg">
             <Home className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl text-gray-900 mb-2">Church Admin System</h1>
+          <h1 className="text-3xl text-gray-900 mb-2">PRAISE HILL-TEMPLE</h1>
           <p className="text-gray-600">Sign in to manage your church</p>
         </div>
 

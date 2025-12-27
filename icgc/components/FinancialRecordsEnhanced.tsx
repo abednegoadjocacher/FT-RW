@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Download, Search, Trash2 , MessageSquare, UserPlus, Edit2, Save, X, CheckCircle, FileText, Eye } from 'lucide-react';
+import { Download, Search, Trash2 , MessageSquare, UserPlus, Edit2, Save, X, CheckCircle, FileText, Eye } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import CediIcon from "./CediIcon"
 import { Member, Transaction, PaymentForm } from '@/interface';
@@ -47,11 +47,9 @@ export default function FinancialRecordsEnhanced() {
   });
 
   const [members, setMembers] = useState<Member[]>([]);
-
   const [editForm, setEditForm] = useState<Member | null>(null);
-
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -74,25 +72,43 @@ export default function FinancialRecordsEnhanced() {
     }
   }, [selectedMemberId]);
 
-  // Add this helper at the top to refresh your data from the DB after changes
   useEffect(() => {
-    fetchMembers();
-    fetchTransactions();
-  }, []);
+  const loadInitialData = async () => {
+    setIsLoading(true); // Ensure spinner starts
+    try {
+      // Promise.all runs both fetches at the same time for better speed
+      await Promise.all([
+        fetchMembers(),
+        fetchTransactions()
+      ]);
+    } catch (error) {
+      console.error("Initialization error:", error);
+    } finally {
+      setIsLoading(false); // Data is ready, turn off spinner
+    }
+  };
+
+  loadInitialData();
+}, []);
+
   const fetchMembers = async () => {
   const response = await fetch('/api/members');
+  if (!response.ok) throw new Error('Failed to fetch members');
   const data = await response.json();
   setMembers(data);
 };
 
 const fetchTransactions = async () => {
   const response = await fetch('/api/transactions');
+  if (!response.ok) throw new Error('Failed to fetch transactions');
   const data = await response.json();
+  
   const cleanData = data.map((tx: any) => ({
     ...tx,
     amount: Number(tx.amount || 0),
     memberId: Number(tx.member_id)
   }));
+  
   setTransactions(cleanData);
 };
 
@@ -206,7 +222,7 @@ const handleEditMember = (member: Member) => {
   setEditForm({ ...member });
 };
   const generateMessage = (transaction: Transaction) => {
-    return `Dear ${transaction.member},\n\nThank you for your ${transaction.type} contribution of $${transaction.amount} for the month of ${transaction.month}.\n\nYour support is greatly appreciated and helps us continue our mission.\n\nPayment Method: ${transaction.method}\nDate: ${transaction.date} at ${transaction.time}\n\nGod bless you!\n\nChurch Administration`;
+    return `Dear ${transaction.member},\n\nThank you for your ${transaction.type} contribution of ₵${transaction.amount} for the month of ${transaction.month}.\n\nYour support is greatly appreciated and helps us continue our mission.\n\nPayment Method: ${transaction.method}\nDate: ${transaction.date} at ${transaction.time}\n\nGod bless you!\n\nChurch Administration`;
   };
 
   const handleSendMessage = (transaction: Transaction) => {
@@ -736,6 +752,23 @@ const handleConfirmSendMessage = async () => {
   const selectedMemberTransactions = selectedMemberId ? getMemberTransactions(selectedMemberId) : [];
   const selectedMemberTotal = selectedMemberId ? getMemberTotal(selectedMemberId) : 0;
 
+
+  if (isLoading) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] w-full bg-white rounded-xl shadow-sm border border-gray-100">
+      <div className="relative">
+        {/* Outer ring */}
+        <div className="w-12 h-12 border-4 border-blue-100 rounded-full"></div>
+        {/* Spinning inner ring */}
+        <div className="absolute top-0 left-0 w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+      <p className="mt-4 text-gray-500 font-medium animate-pulse">
+        Synchronizing financial records...
+      </p>
+    </div>
+  );
+}
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 pb-24 lg:pb-8">
       <div className="max-w-7xl mx-auto">
@@ -1014,7 +1047,7 @@ const handleConfirmSendMessage = async () => {
               {/* Total Contributions Card */}
               <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 text-white">
                 <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="w-5 h-5" />
+                  <CediIcon className="w-5 h-5" />
                   <p className="text-sm text-green-100">Total Contributions</p>
                 </div>
                 <h3 className="text-3xl mb-1"><CediIcon />{getFilteredTotal()}</h3>
@@ -1034,7 +1067,7 @@ const handleConfirmSendMessage = async () => {
                 return (
                   <div key={type} className={`bg-gradient-to-br ${color.bg} rounded-xl p-4 text-white`}>
                     <p className={`text-sm ${color.text} mb-2`}>{type}</p>
-                    <h3 className="text-2xl mb-1">${data.total}</h3>
+                    <h3 className="text-2xl mb-1"><CediIcon />{data.total}</h3>
                     <p className={`text-xs ${color.text}`}>{data.count} payment{data.count !== 1 ? 's' : ''}</p>
                   </div>
                 );
@@ -1147,7 +1180,7 @@ const handleConfirmSendMessage = async () => {
                     Phone Number
                   </th>
                   <th className="text-left px-6 py-3 text-xs text-gray-600 uppercase tracking-wider">
-                    First Fruit #
+                    First Fruit ID
                   </th>
                   <th className="text-left px-6 py-3 text-xs text-gray-600 uppercase tracking-wider">
                     Type
@@ -1237,9 +1270,9 @@ const handleConfirmSendMessage = async () => {
                           onClick={handleSaveMember}
                           disabled={isSubmitting}
                           className={`px-4 py-2 rounded-lg text-white transition-colors flex items-center justify-center gap-2 ${
-                            isSubmitting 
-                              ? 'bg-blue-400 cursor-not-allowed' 
-                              : 'bg-blue-600 hover:bg-blue-700'
+                            isSubmitting
+                              ? 'bg-green-400 cursor-not-allowed'
+                              : 'bg-green-500 hover:bg-green-600'
                           }`}
                         >
                           {isSubmitting ? (
@@ -1312,9 +1345,9 @@ const handleConfirmSendMessage = async () => {
                             onClick={handlePaymentFormSubmit}
                             disabled={isSubmitting}
                             className={`flex items-center gap-1 px-3 py-1.5 text-white rounded-lg transition-colors text-sm whitespace-nowrap ${
-                              isSubmitting 
-                                ? 'bg-green-400 cursor-not-allowed' 
-                                : 'bg-green-600 hover:bg-green-700'
+                              isSubmitting
+                                ? 'bg-green-400 cursor-not-allowed'
+                                : 'bg-green-500 hover:bg-green-600'
                             }`}
                           >
                             {isSubmitting ? (
@@ -1376,7 +1409,7 @@ const handleConfirmSendMessage = async () => {
                             }}
                             className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm whitespace-nowrap"
                           >
-                            <DollarSign className="w-4 h-4" />
+                            <CediIcon className="w-4 h-4" />
                             Add Payment
                           </button>
                           <button
@@ -1481,7 +1514,7 @@ const handleConfirmSendMessage = async () => {
                 onClick={handleAddMember}
                 disabled={isAddingMember}
                 className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-white font-medium w-full
-                  ${isAddingMember ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                  ${isAddingMember ? 'bg-green-400 cursor-not-allowed' : 'bg-green-500 hover:bg-gregreen00'}`}
                 >
                 {isAddingMember ? (
                   <>
@@ -1620,7 +1653,7 @@ const handleConfirmSendMessage = async () => {
             <div className="flex gap-3">
               <button
                 onClick={handleConfirmSendMessageToAll}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
               >
                 Confirm & Send
               </button>

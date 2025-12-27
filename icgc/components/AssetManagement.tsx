@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { Package, Plus, Search, Edit2, Trash2, Save, X, TrendingUp, Calendar, DollarSign, FolderTree } from 'lucide-react';
-import {Asset, AssetCategory} from '@/interface';
+import { useState, useEffect } from 'react';
+import { Package, Plus, Search, Edit2, Trash2, Save, X, TrendingUp, Calendar, DollarSign, FolderTree, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import {Asset, AssetCategory} from "@/interface";
+import CediIcon from "@/components/CediIcon"
 
 export default function AssetManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -9,80 +11,7 @@ export default function AssetManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
 
-  const [assets, setAssets] = useState<Asset[]>([
-    {
-      id: 1,
-      name: 'Church Building',
-      category: 'Building',
-      purchaseDate: '2020-01-15',
-      purchaseValue: 500000,
-      currentValue: 600000,
-      condition: 'Excellent',
-      location: 'Main Site',
-      description: 'Main church building with sanctuary and offices',
-      quantity: 1,
-    },
-    {
-      id: 2,
-      name: 'Sound System',
-      category: 'Audio Visual equipment',
-      purchaseDate: '2022-06-20',
-      purchaseValue: 3500,
-      currentValue: 2800,
-      condition: 'Excellent',
-      location: 'Main Sanctuary',
-      description: 'Complete sound system with speakers and mixer',
-      quantity: 1,
-    },
-    {
-      id: 3,
-      name: 'Padded Chairs',
-      category: 'Furniture & fittings',
-      purchaseDate: '2021-03-10',
-      purchaseValue: 5000,
-      currentValue: 4000,
-      condition: 'Good',
-      location: 'Main Sanctuary',
-      description: 'Padded chairs for congregation',
-      quantity: 200,
-    },
-    {
-      id: 4,
-      name: 'Grand Piano',
-      category: 'Musical equipment',
-      purchaseDate: '2020-08-05',
-      purchaseValue: 8000,
-      currentValue: 7500,
-      condition: 'Excellent',
-      location: 'Main Sanctuary',
-      description: 'Grand piano for worship services',
-      quantity: 1,
-    },
-    {
-      id: 5,
-      name: 'Office Computers',
-      category: 'Computers & accessories',
-      purchaseDate: '2023-05-12',
-      purchaseValue: 4500,
-      currentValue: 3500,
-      condition: 'Good',
-      location: 'Admin Office',
-      description: 'Desktop computers for administrative staff',
-      quantity: 5,
-    },
-    {
-      id: 6,
-      name: 'Church Van',
-      category: 'Motor vehicle',
-      purchaseDate: '2021-11-20',
-      purchaseValue: 35000,
-      currentValue: 28000,
-      condition: 'Good',
-      location: 'Church Parking',
-      description: '15-seater van for church outreach',
-      quantity: 1,
-    },
-  ]);
+  const [assets, setAssets] = useState<Asset[]>([]);
 
   const [newAsset, setNewAsset] = useState<Omit<Asset, 'id'>>({
     name: '',
@@ -97,63 +26,133 @@ export default function AssetManagement() {
   });
 
   const [editForm, setEditForm] = useState<Asset | null>(null);
-
-  const [categories, setCategories] = useState<AssetCategory[]>([
-    { id: 1, name: 'Building', code: 'BLDG' },
-    { id: 2, name: 'Plant & machinery', code: 'P&M' },
-    { id: 3, name: 'Furniture & fittings', code: 'F&F' },
-    { id: 4, name: 'Office equipment', code: 'OFFEQ' },
-    { id: 5, name: 'Musical equipment', code: 'MUSEQ' },
-    { id: 6, name: 'Audio Visual equipment', code: 'AVEQ' },
-    { id: 7, name: 'Motor vehicle', code: 'MV' },
-    { id: 8, name: 'Computers & accessories', code: 'COMP' },
-    { id: 9, name: 'Security equipment', code: 'SECEQ' },
-    { id: 10, name: 'Copyrights & trademarks', code: 'C&T' },
-  ]);
-
+  const [categories, setCategories] = useState<AssetCategory[]>([]);
   const [newCategory, setNewCategory] = useState({ name: '', code: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [deletingAssetId, setDeletingAssetId] = useState<number | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleAddAsset = () => {
-    if (!newAsset.name || !newAsset.purchaseDate || !newAsset.purchaseValue || !newAsset.location) {
-      alert('Please fill in all required fields: Name, Purchase Date, Purchase Value, and Location');
-      return;
+  const fetchData = async () => {
+    try {
+        const [assetRes, catRes] = await Promise.all([
+            fetch('/api/assets'),
+            fetch('/api/asset-categories')
+        ]);
+        setAssets(await assetRes.json());
+        setCategories(await catRes.json());
+    } finally {
+        setIsLoading(false);
     }
+};
 
-    const asset: Asset = {
-      id: assets.length + 1,
-      ...newAsset,
-      currentValue: newAsset.currentValue || newAsset.purchaseValue,
-      quantity: newAsset.quantity || 1,
-    };
+  useEffect(() => {
+      fetchData();
+  }, []);
 
-    setAssets([...assets, asset]);
-    setNewAsset({
-      name: '',
-      category: 'Building',
-      purchaseDate: '',
-      purchaseValue: 0,
-      currentValue: 0,
-      condition: 'Excellent',
-      location: '',
-      description: '',
-      quantity: 1,
+
+  const handleAddAsset = async () => {
+  // 1. Validation check
+  if (!newAsset.name || !newAsset.purchaseDate || !newAsset.purchaseValue || !newAsset.location) {
+    alert('Please fill in all required fields');
+    return;
+  }
+
+  setIsSubmitting(true); // Start loading
+
+  try {
+    const response = await fetch('/api/assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newAsset),
     });
-    setShowAddModal(false);
-    alert('Asset added successfully!');
-  };
+
+    if (response.ok) {
+      await fetchData(); // Refresh the list from the DB
+      setShowAddModal(false);
+      setNewAsset({
+        name: '',
+        category: categories.length > 0 ? categories[0].name : 'Building',
+        purchaseDate: '',
+        purchaseValue: 0,
+        currentValue: 0,
+        condition: 'Excellent',
+        location: '',
+        description: '',
+        quantity: 1,
+      });
+    } else {
+      alert('Failed to save asset to the database.');
+    }
+  } catch (error) {
+    console.error("Save error:", error);
+    alert('A network error occurred.');
+  } finally {
+    setIsSubmitting(false); // Stop loading regardless of success or failure
+  }
+};
+
+const handleSaveAsset = async () => {
+  if (!editForm) return;
+
+  setIsSubmitting(true); // Start the loading effect
+
+  try {
+    const response = await fetch('/api/assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm),
+    });
+
+    if (response.ok) {
+      await fetchData(); // Refresh the list from the database
+      setEditingAssetId(null);
+      setEditForm(null);
+      alert('Asset updated successfully!');
+    } else {
+      alert('Failed to update the asset in the database.');
+    }
+  } catch (error) {
+    console.error("Update error:", error);
+    alert('A network error occurred while saving.');
+  } finally {
+    setIsSubmitting(false); // Stop the loading effect
+  }
+};
+
+
+  //   if (!newAsset.name || !newAsset.purchaseDate || !newAsset.purchaseValue || !newAsset.location) {
+  //     alert('Please fill in all required fields: Name, Purchase Date, Purchase Value, and Location');
+  //     return;
+  //   }
+
+  //   const asset: Asset = {
+  //     id: assets.length + 1,
+  //     ...newAsset,
+  //     currentValue: newAsset.currentValue || newAsset.purchaseValue,
+  //     quantity: newAsset.quantity || 1,
+  //   };
+
+  //   setAssets([...assets, asset]);
+  //   setNewAsset({
+  //     name: '',
+  //     category: 'Building',
+  //     purchaseDate: '',
+  //     purchaseValue: 0,
+  //     currentValue: 0,
+  //     condition: 'Excellent',
+  //     location: '',
+  //     description: '',
+  //     quantity: 1,
+  //   });
+  //   setShowAddModal(false);
+  //   alert('Asset added successfully!');
+  // };
 
   const handleEditAsset = (asset: Asset) => {
     setEditingAssetId(asset.id);
     setEditForm({ ...asset });
-  };
-
-  const handleSaveAsset = () => {
-    if (!editForm) return;
-
-    setAssets(assets.map(a => a.id === editForm.id ? editForm : a));
-    setEditingAssetId(null);
-    setEditForm(null);
-    alert('Asset updated successfully!');
   };
 
   const handleCancelEdit = () => {
@@ -161,60 +160,105 @@ export default function AssetManagement() {
     setEditForm(null);
   };
 
-  const handleDeleteAsset = (id: number) => {
-    const asset = assets.find(a => a.id === id);
-    if (window.confirm(`Are you sure you want to remove "${asset?.name}" from the asset list? This action cannot be undone.`)) {
+  const handleDeleteAsset = async (id: number) => {
+  const asset = assets.find(a => a.id === id);
+  if (!window.confirm(`Are you sure you want to remove "${asset?.name}"?`)) return;
+
+  setDeletingAssetId(id); // Set the specific ID being deleted
+
+  try {
+    const response = await fetch(`/api/assets?id=${id}`, { method: 'DELETE' });
+    if (response.ok) {
       setAssets(assets.filter(a => a.id !== id));
-      alert('Asset removed successfully!');
+    } else {
+      alert('Failed to delete asset from database.');
     }
-  };
+  } catch (error) {
+    console.error("Delete error:", error);
+  } finally {
+    setDeletingAssetId(null); // Reset loading state
+  }
+};
 
-  const handleAddCategory = () => {
-    if (!newCategory.name || !newCategory.code) {
-      alert('Please fill in both Category Name and Code');
-      return;
+const handleAddCategory = async () => {
+  if (!newCategory.name || !newCategory.code) {
+    alert('Please fill in both Category Name and Code');
+    return;
+  }
+
+  // Check if code already exists locally before hitting the DB
+  if (categories.some(cat => cat.code.toUpperCase() === newCategory.code.toUpperCase())) {
+    alert('This code already exists. Please use a unique code.');
+    return;
+  }
+
+  setIsCreatingCategory(true); // Start loading
+
+  try {
+    const response = await fetch('/api/asset-categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newCategory.name,
+        code: newCategory.code.toUpperCase()
+      }),
+    });
+
+    if (response.ok) {
+      await fetchData(); // Refresh the list so the new category appears in dropdowns
+      setNewCategory({ name: '', code: '' });
+      alert('Category added successfully!');
+    } else {
+      const errorData = await response.json();
+      alert(errorData.error || 'Failed to add category');
     }
+  } catch (error) {
+    console.error("Category creation error:", error);
+    alert('Network error while creating category');
+  } finally {
+    setIsCreatingCategory(false); // Stop loading
+  }
+};
+  
+const handleDeleteCategory = async (id: number) => {
+  const category = categories.find(c => c.id === id);
+  
+  const assetsUsingCategory = assets.filter(a => a.category === category?.name);
+  if (assetsUsingCategory.length > 0) {
+    alert(`Cannot delete: ${assetsUsingCategory.length} asset(s) are using this category.`);
+    return;
+  }
 
-    // Check if code already exists
-    if (categories.some(cat => cat.code.toUpperCase() === newCategory.code.toUpperCase())) {
-      alert('This code already exists. Please use a unique code.');
-      return;
-    }
+  if (!window.confirm(`Delete category "${category?.name}"?`)) return;
 
-    const category: AssetCategory = {
-      id: categories.length + 1,
-      name: newCategory.name,
-      code: newCategory.code.toUpperCase(),
-    };
+  setDeletingCategoryId(id); // Start loading for this specific category
 
-    setCategories([...categories, category]);
-    setNewCategory({ name: '', code: '' });
-    alert('Category added successfully!');
-  };
-
-  const handleDeleteCategory = (id: number) => {
-    const category = categories.find(c => c.id === id);
-    
-    // Check if any assets use this category
-    const assetsUsingCategory = assets.filter(a => a.category === category?.name);
-    if (assetsUsingCategory.length > 0) {
-      alert(`Cannot delete this category because ${assetsUsingCategory.length} asset(s) are using it. Please reassign those assets first.`);
-      return;
-    }
-
-    if (window.confirm(`Are you sure you want to delete the category "${category?.name}"?`)) {
+  try {
+    const response = await fetch(`/api/asset-categories?id=${id}`, { method: 'DELETE' });
+    if (response.ok) {
       setCategories(categories.filter(c => c.id !== id));
-      alert('Category deleted successfully!');
     }
-  };
-
+  } catch (error) {
+    console.error("Category delete error:", error);
+  } finally {
+    setDeletingCategoryId(null);
+  }
+};
   const filteredAssets = assets.filter(asset => {
-    const matchesSearch = asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'All' || asset.category === filterCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Use ?? '' to provide an empty string if the value is null or undefined
+  const name = asset.name?.toLowerCase() ?? '';
+  const description = asset.description?.toLowerCase() ?? '';
+  const location = asset.location?.toLowerCase() ?? '';
+  const search = searchTerm.toLowerCase();
+
+  const matchesSearch = name.includes(search) || 
+                        description.includes(search) || 
+                        location.includes(search);
+
+  const matchesCategory = filterCategory === 'All' || asset.category === filterCategory;
+  
+  return matchesSearch && matchesCategory;
+});
 
   const totalAssets = assets.reduce((sum, asset) => sum + asset.quantity, 0);
   const totalValue = assets.reduce((sum, asset) => sum + (asset.currentValue * asset.quantity), 0);
@@ -241,6 +285,132 @@ export default function AssetManagement() {
     }
   };
 
+  const exportToExcel = () => {
+    // Group assets by category
+    const assetsByCategory: Record<string, Asset[]> = {};
+    assets.forEach(asset => {
+      if (!assetsByCategory[asset.category]) {
+        assetsByCategory[asset.category] = [];
+      }
+      assetsByCategory[asset.category].push(asset);
+    });
+
+    // Create worksheet data with proper structure
+    const wsData: any[] = [];
+    
+    // Add header row
+    wsData.push([
+      'Asset Class',
+      'Date of Acquisition',
+      'Asset details',
+      'Asset code',
+      'Cost',
+      'condition',
+      'Date disposed/scrapped',
+      'Asset location'
+    ]);
+
+    let totalCost = 0;
+
+    // Add data rows grouped by category
+    Object.entries(assetsByCategory).forEach(([category, categoryAssets]) => {
+      categoryAssets.forEach((asset, index) => {
+        // Get category code
+        const categoryCode = categories.find(c => c.name === category)?.code || 'N/A';
+        
+        // Generate asset code based on category, location, and year
+        const purchaseYear = new Date(asset.purchaseDate).getFullYear().toString().slice(-2);
+        const assetCode = `${categoryCode}/PHT/${purchaseYear}/${String(asset.id).padStart(6, '0')}`;
+        
+        // Format date
+        const formattedDate = new Date(asset.purchaseDate).toLocaleDateString('en-GB');
+        
+        // Calculate total cost (purchase value * quantity)
+        const assetCost = asset.purchaseValue * asset.quantity;
+        totalCost += assetCost;
+        
+        wsData.push([
+          index === 0 ? category : '', // Show category only on first row of each group
+          formattedDate,
+          `${asset.name} - ${asset.description}`,
+          assetCode,
+          assetCost.toFixed(2),
+          asset.condition,
+          '', // Date disposed/scrapped (empty for now)
+          asset.location
+        ]);
+      });
+    });
+
+    // Add empty row
+    wsData.push(['', '', '', '', '', '', '', '']);
+    
+    // Add total row
+    wsData.push(['', 'total', '', '', totalCost.toFixed(2), '', '', '']);
+
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 25 }, // Asset Class
+      { wch: 18 }, // Date of Acquisition
+      { wch: 35 }, // Asset details
+      { wch: 25 }, // Asset code
+      { wch: 12 }, // Cost
+      { wch: 12 }, // condition
+      { wch: 20 }, // Date disposed/scrapped
+      { wch: 25 }  // Asset location
+    ];
+
+    // Apply borders to all cells with data
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!ws[cellAddress]) continue;
+        
+        if (!ws[cellAddress].s) ws[cellAddress].s = {};
+        ws[cellAddress].s.border = {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        };
+
+        // Bold header row
+        if (R === 0) {
+          ws[cellAddress].s.font = { bold: true };
+          ws[cellAddress].s.fill = { fgColor: { rgb: 'CCCCCC' } };
+        }
+
+        // Bold total row
+        if (R === range.e.r && wsData[R] && wsData[R][1] === 'total') {
+          ws[cellAddress].s.font = { bold: true };
+        }
+      }
+    }
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Asset Report');
+
+    // Generate filename with current date
+    const currentDate = new Date().toISOString().split('T')[0];
+    const filename = `Church_Asset_Report_${currentDate}.xlsx`;
+
+    // Save file
+    XLSX.writeFile(wb, filename);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+        <div className="w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-gray-600 font-medium">Loading Church Assets...</p>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gray-50 p-4 pb-24 lg:pb-8">
       <div className="max-w-7xl mx-auto">
@@ -275,11 +445,11 @@ export default function AssetManagement() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-blue-600" />
+                <CediIcon className="w-5 h-5 text-blue-600" />
               </div>
               <p className="text-sm text-gray-600">Current Value</p>
             </div>
-            <h3 className="text-3xl text-gray-900">${totalValue.toLocaleString()}</h3>
+            <h3 className="text-3xl text-gray-900"><CediIcon />{totalValue.toLocaleString()}</h3>
             <p className="text-xs text-gray-500 mt-1">Total market value</p>
           </div>
 
@@ -290,7 +460,7 @@ export default function AssetManagement() {
               </div>
               <p className="text-sm text-gray-600">Purchase Value</p>
             </div>
-            <h3 className="text-3xl text-gray-900">${totalPurchaseValue.toLocaleString()}</h3>
+            <h3 className="text-3xl text-gray-900"><CediIcon />{totalPurchaseValue.toLocaleString()}</h3>
             <p className="text-xs text-gray-500 mt-1">Original investment</p>
           </div>
 
@@ -320,7 +490,7 @@ export default function AssetManagement() {
             </div>
             <button
               onClick={() => setShowCategoryModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
             >
               <Plus className="w-4 h-4" />
               Manage Categories
@@ -368,6 +538,13 @@ export default function AssetManagement() {
                     <option key={cat.code} value={cat.name}>{cat.name}</option>
                   ))}
                 </select>
+                <button
+                  onClick={exportToExcel}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Export to Excel
+                </button>
               </div>
             </div>
           </div>
@@ -387,6 +564,9 @@ export default function AssetManagement() {
                   </th>
                   <th className="text-left px-6 py-3 text-xs text-gray-600 uppercase tracking-wider">
                     Current Value
+                  </th>
+                  <th className="text-left px-6 py-3 text-xs text-gray-600 uppercase tracking-wider">
+                    Purchase Value
                   </th>
                   <th className="text-left px-6 py-3 text-xs text-gray-600 uppercase tracking-wider">
                     Quantity
@@ -442,6 +622,16 @@ export default function AssetManagement() {
                             className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                           />
                         </td>
+
+                          <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            value={editForm.purchaseValue}
+                            onChange={(e) => setEditForm({ ...editForm, purchaseValue: parseFloat(e.target.value) || 0 })}
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </td>
+
                         <td className="px-6 py-4">
                           <input
                             type="number"
@@ -474,10 +664,24 @@ export default function AssetManagement() {
                           <div className="flex gap-2">
                             <button
                               onClick={handleSaveAsset}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                              disabled={isSubmitting} // Prevent multiple clicks
+                              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors text-sm ${
+                                isSubmitting 
+                                  ? 'bg-blue-400 cursor-not-allowed text-white' 
+                                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                              }`}
                             >
-                              <Save className="w-4 h-4" />
-                              Save
+                              {isSubmitting ? (
+                                <>
+                                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                  Saving...
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="w-4 h-4" />
+                                  Save
+                                </>
+                              )}
                             </button>
                             <button
                               onClick={handleCancelEdit}
@@ -504,7 +708,8 @@ export default function AssetManagement() {
                         <td className="px-6 py-4 text-gray-900 text-sm">
                           {new Date(asset.purchaseDate).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-4 text-gray-900">${asset.currentValue.toLocaleString()}</td>
+                        <td className="px-6 py-4 text-gray-900"><CediIcon />{asset.currentValue.toLocaleString()}</td>
+                        <td className="px-6 py-4 text-gray-900"><CediIcon />{asset.purchaseValue.toLocaleString()}</td>
                         <td className="px-6 py-4 text-gray-900">{asset.quantity}</td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getConditionColor(asset.condition)}`}>
@@ -523,10 +728,15 @@ export default function AssetManagement() {
                             </button>
                             <button
                               onClick={() => handleDeleteAsset(asset.id)}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                              disabled={deletingAssetId === asset.id}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm disabled:bg-red-400"
                             >
-                              <Trash2 className="w-4 h-4" />
-                              Remove
+                              {deletingAssetId === asset.id ? (
+                                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              ) : (
+                                <Trash2 className="w-3 h-3" />
+                              )}
+                              {deletingAssetId === asset.id ? 'Deleting...' : 'Delete'}
                             </button>
                           </div>
                         </td>
@@ -550,7 +760,7 @@ export default function AssetManagement() {
 
       {/* Add Asset Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-green-700 bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-green-700 bg-opacity-50 flex justify-center overflow-y-auto p-2 py-10 z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 h-fit my-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-gray-900">Add New Asset</h2>
@@ -605,7 +815,7 @@ export default function AssetManagement() {
 
               <div>
                 <label className="block text-sm text-gray-700 mb-2">
-                  Purchase Value ($) <span className="text-red-500">*</span>
+                  Purchase Value (<CediIcon />) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -618,7 +828,7 @@ export default function AssetManagement() {
 
               <div>
                 <label className="block text-sm text-gray-700 mb-2">
-                  Current Value ($)
+                  Current Value (<CediIcon />)
                 </label>
                 <input
                   type="number"
@@ -688,9 +898,24 @@ export default function AssetManagement() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleAddAsset}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                disabled={isSubmitting} // Disable while loading
+                className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                  isSubmitting 
+                    ? 'bg-green-400 cursor-not-allowed text-white' 
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
               >
-                Add Asset
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving Asset...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    Save Asset
+                  </>
+                )}
               </button>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -705,10 +930,11 @@ export default function AssetManagement() {
 
       {/* Category Management Modal */}
       {showCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 my-8">
+        <div className="fixed inset-0 bg-green-700 bg-opacity-50 flex justify-center overflow-y-auto p-2 py-10 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 h-fit my-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-gray-900">Manage Asset Categories</h2>
+              <h2 className="text-gray-900">Manage 
+                Categories</h2>
               <button
                 onClick={() => setShowCategoryModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -749,10 +975,24 @@ export default function AssetManagement() {
               </div>
               <button
                 onClick={handleAddCategory}
-                className="mt-4 flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                disabled={isCreatingCategory} // Prevent double-clicks
+                className={`mt-4 flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm ${
+                  isCreatingCategory 
+                    ? 'bg-green-400 cursor-not-allowed text-white' 
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
               >
-                <Plus className="w-4 h-4" />
-                Add Category
+                {isCreatingCategory ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    Add Category
+                  </>
+                )}
               </button>
             </div>
 
@@ -786,10 +1026,15 @@ export default function AssetManagement() {
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleDeleteCategory(category.id)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                            disabled={deletingCategoryId === category.id}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm disabled:bg-red-400"
                           >
-                            <Trash2 className="w-3 h-3" />
-                            Delete
+                            {deletingCategoryId === category.id ? (
+                              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                            {deletingCategoryId === category.id ? 'Removing...' : 'Delete'}
                           </button>
                         </td>
                       </tr>
@@ -802,7 +1047,7 @@ export default function AssetManagement() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowCategoryModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
               >
                 Close
               </button>

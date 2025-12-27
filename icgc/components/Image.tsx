@@ -5,17 +5,17 @@ interface MyImageProps {
   className?: string;
 }
 
-const MyImage = ({ className }: MyImageProps) => {
+const ChurchImage = ({ className }: MyImageProps) => {
   return (
-  <div className={`w-20 h-20 bg-green-600 rounded-lg flex items-center justify-center ${className}`}>
+  <>
   <Image 
   src="/images/icgc-pht.jpeg" 
   alt="icgc-logo" 
-  width={300} 
-  height={300}
+  width={400} 
+  height={400}
   priority />
-  </div>
+  </>
   );
 };
 
-export default MyImage;
+export default ChurchImage;

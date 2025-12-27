@@ -54,3 +54,6 @@ export interface AssetCategory {
 export interface AdminDashboardProps {
   onNavigate: (screen: string) => void;
 }
+export interface LoginProps {
+  onLogin: (email: string) => void;
+}

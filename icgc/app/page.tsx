@@ -2,24 +2,32 @@
 import { useState, useEffect } from 'react';
 import { Home, FileText, Menu, X, Package, LogOut } from 'lucide-react';
 
+// Removed AdminDashboard import since we don't need it anymore
 import AssetManagement from "@/components/AssetManagement";
-import AdminDashboard from "@/components/AdminDashboard";
 import FinancialRecordsEnhanced from '@/components/FinancialRecordsEnhanced';
 import Login from '@/components/Login';
+import ChurchImage from "@/components/Image";
 
 export default function HomePage() {
-  const [activeScreen, setActiveScreen] = useState('admin');
+  const [activeScreen, setActiveScreen] = useState('records');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   
-  // 1. Initialize states as empty/false
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState('');
 
-  // 2. Safely check localStorage after mounting
   useEffect(() => {
-    const savedAuth = localStorage.getItem('isAuthenticated') === 'true';
-    const savedEmail = localStorage.getItem('userEmail') || '';
+    // This keeps the user logged in across page refreshes
+    // And even if the user closes the browser yet the session is still valid
+    // And the user can log in again without having to re-enter their credentials
+    // const savedAuth = localStorage.getItem('isAuthenticated') === 'true';
+    // const savedEmail = localStorage.getItem('userEmail') || '';
+
+    // This keeps the user logged in across page refreshes
+    // And user closes the browser they are logged out
+    // And they must login again.
+    const savedAuth = sessionStorage.getItem('isAuthenticated') === 'true';
+    const savedEmail = sessionStorage.getItem('userEmail') || '';
     
     setIsAuthenticated(savedAuth);
     setUserEmail(savedEmail);
@@ -29,8 +37,12 @@ export default function HomePage() {
   const handleLogin = (email: string) => {
     setIsAuthenticated(true);
     setUserEmail(email);
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('userEmail', email);
+    // localStorage.setItem('isAuthenticated', 'true');
+    // localStorage.setItem('userEmail', email);
+    sessionStorage.setItem('isAuthenticated', 'true');
+    sessionStorage.setItem('userEmail', email);
+    // Ensure we start on records after a fresh login
+    setActiveScreen('records'); 
   };
 
   const handleLogout = () => {
@@ -42,30 +54,28 @@ export default function HomePage() {
     }
   };
 
-  // 3. Prevent Server-Side Rendering mismatch
   if (!mounted) return null;
 
-  // 4. Show login page if not authenticated
+  // Login Compulsory Guard
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
   }
 
+  // 2. CHANGE: Menu only needs these two items now
   const menuItems = [
-    { id: 'admin', label: 'Admin Dashboard', icon: Home },
     { id: 'records', label: 'Financial Records', icon: FileText },
-    { id: 'assets', label: 'Asset Management', icon: Package },
+    { id: 'assets', label: 'Asset Management', icon: Package }
   ];
 
+  // 3. CHANGE: Render logic now defaults to Financial Records
   const renderScreen = () => {
     switch (activeScreen) {
-      case 'admin':
-        return <AdminDashboard onNavigate={setActiveScreen} />;
       case 'records':
         return <FinancialRecordsEnhanced />;
       case 'assets':
         return <AssetManagement />;
       default:
-        return <AdminDashboard onNavigate={setActiveScreen} />;
+        return <FinancialRecordsEnhanced />;
     }
   };
 
@@ -74,15 +84,7 @@ export default function HomePage() {
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-white border-r border-gray-200 flex-shrink-0">
         <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-              <Home className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-gray-900 font-bold leading-none">Church Admin</h1>
-              <p className="text-xs text-gray-500 mt-1">Management System</p>
-            </div>
-          </div>
+              <ChurchImage />
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -113,7 +115,7 @@ export default function HomePage() {
               </span>
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 truncate">Admin User</p>
+              <p className="text-sm font-medium text-gray-900 truncate">Admin</p>
               <p className="text-xs text-gray-500 truncate">{userEmail}</p>
             </div>
           </div>
@@ -137,7 +139,7 @@ export default function HomePage() {
               <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
                 <Home className="w-5 h-5 text-white" />
               </div>
-              <h1 className="font-bold text-gray-900">Church Admin</h1>
+              <h1 className="font-bold text-gray-900">ICGC-PHT</h1>
             </div>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
